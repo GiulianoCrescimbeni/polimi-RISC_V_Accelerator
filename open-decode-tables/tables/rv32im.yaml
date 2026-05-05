@@ -1,0 +1,184 @@
+module_name: rv32im_decoder
+input: 32
+output:
+  - type_name: "decode_out_t"
+  - fields:
+      [
+        "alu",
+        "rs1",
+        "rs2",
+        "imm12",
+        "rd",
+        "shimm5",
+        "imm20",
+        "pc",
+        "load",
+        "store",
+        "lsu",
+        "add",
+        "sub",
+        "land",
+        "lor",
+        "lxor",
+        "sll",
+        "sra",
+        "srl",
+        "slt",
+        "unsign",
+        "condbr",
+        "beq",
+        "bne",
+        "bge",
+        "blt",
+        "jal",
+        "by",
+        "half",
+        "word",
+        "mul",
+        "rs1_sign",
+        "rs2_sign",
+        "low",
+        "div",
+        "rem",
+        "nop",
+        "legal"
+      ]
+decodes:
+  - instr: "nop"
+    match: "00000000000000000000000000010011"
+    decodes: ["nop", "legal"]
+  - instr: "add"
+    match: "0000000..........000.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "add", "legal"]
+  - instr: "addi"
+    match: ".................000.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "add", "legal"]
+  - instr:  "sub"
+    match: "0100000..........000.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "sub", "legal"]
+  - instr:  "and"
+    match: "0000000..........111.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "land", "legal"]
+  - instr:  "andi"
+    match: ".................111.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "land", "legal"]
+  - instr:  "or"
+    match: "0000000..........110.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "lor", "legal"]
+  - instr:  "ori"
+    match: ".................110.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "lor", "legal"]
+  - instr:  "xor"
+    match: "0000000..........100.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "lxor", "legal"]
+  - instr:  "xori"
+    match: ".................100.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "lxor", "legal"]
+  - instr:  "sll"
+    match: "0000000..........001.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "sll", "legal"]
+  - instr:  "slli"
+    match: "0000000..........001.....0010011"
+    decodes: ["alu", "rs1", "shimm5", "rd", "sll", "legal"]
+  - instr:  "sra"
+    match: "0100000..........101.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "sra", "legal"]
+  - instr:  "srai"
+    match: "0100000..........101.....0010011"
+    decodes: ["alu", "rs1", "shimm5", "rd", "sra", "legal"]
+  - instr:  "srl "
+    match: "0000000..........101.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "srl", "legal"]
+  - instr:  "srli"
+    match: "0000000..........101.....0010011"
+    decodes: ["alu", "rs1", "shimm5", "rd", "srl", "legal"]
+  - instr:  "lui"
+    match: ".........................0110111"
+    decodes: ["alu", "imm20", "rd", "lor", "legal"]
+  - instr:  "auipc"
+    match: ".........................0010111"
+    decodes: ["alu", "imm20", "pc", "rd", "add", "legal"]
+  - instr:  "slt"
+    match: "0000000..........010.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "sub", "slt", "legal"]
+  - instr:  "sltu"
+    match: "0000000..........011.....0110011"
+    decodes: ["alu", "rs1", "rs2", "rd", "sub", "slt", "unsign", "legal"]
+  - instr:  "slti"
+    match: ".................010.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "sub", "slt", "legal"]
+  - instr:  "sltiu"
+    match: ".................011.....0010011"
+    decodes: ["alu", "rs1", "imm12", "rd", "sub", "slt", "unsign", "legal"]
+  - instr:  "beq"
+    match: ".................000.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "beq", "legal"]
+  - instr:  "bne"
+    match: ".................001.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "bne", "legal"]
+  - instr:  "bge"
+    match: ".................101.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "bge", "legal"]
+  - instr:  "blt "
+    match: ".................100.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "blt", "legal"]
+  - instr:  "bgeu"
+    match: ".................111.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "bge", "unsign", "legal"]
+  - instr:  "bltu"
+    match: ".................110.....1100011"
+    decodes: ["alu", "rs1", "rs2", "sub", "condbr", "blt", "unsign", "legal"]
+  - instr:  "jal"
+    match: ".........................1101111"
+    decodes: ["alu", "imm20", "rd", "pc", "jal", "legal"]
+  - instr:  "jalr"
+    match: ".................000.....1100111"
+    decodes: ["alu", "rs1", "rd", "imm12", "jal", "legal"]
+  - instr:  "lb"
+    match: ".................000.....0000011"
+    decodes: ["lsu", "load", "rs1", "rd", "by", "legal"]
+  - instr:  "lh"
+    match: ".................001.....0000011"
+    decodes: ["lsu", "load", "rs1", "rd", "half", "legal"]
+  - instr:  "lw"
+    match: ".................010.....0000011"
+    decodes: ["lsu", "load", "rs1", "rd", "word", "legal"]
+  - instr:  "sb"
+    match: ".................000.....0100011"
+    decodes: ["lsu", "store", "rs1", "rs2", "by", "legal"]
+  - instr:  "sh"
+    match: ".................001.....0100011"
+    decodes: ["lsu", "store", "rs1", "rs2", "half", "legal"]
+  - instr:  "sw"
+    match: ".................010.....0100011"
+    decodes: ["lsu", "store", "rs1", "rs2", "word", "legal"]
+  - instr:  "lbu"
+    match: ".................100.....0000011"
+    decodes: ["lsu", "load", "rs1", "rd", "by", "unsign", "legal"]
+  - instr:  "lhu"
+    match: ".................101.....0000011"
+    decodes: ["lsu", "load", "rs1", "rd", "half", "unsign", "legal"]
+  - instr:  "mul"
+    match: "0000001..........000.....0110011"
+    decodes: ["mul", "rs1", "rs2", "rd", "low", "legal"]
+  - instr:  "mulh"
+    match: "0000001..........001.....0110011"
+    decodes: ["mul", "rs1", "rs2", "rd", "rs1_sign", "rs2_sign", "legal"]
+  - instr:  "mulhsu"
+    match: "0000001..........010.....0110011"
+    decodes: ["mul", "rs1", "rs2", "rd", "rs1_sign", "legal"]
+  - instr:  "mulhu"
+    match: "0000001..........011.....0110011"
+    decodes: ["mul", "rs1", "rs2", "rd", "legal"]
+  - instr:  "div"
+    match: "0000001..........100.....0110011"
+    decodes: ["div", "rs1", "rs2", "rd", "legal"]
+  - instr:  "divu"
+    match: "0000001..........101.....0110011"
+    decodes: ["div", "rs1", "rs2", "rd", "unsign", "legal"]
+  - instr:  "rem"
+    match: "0000001..........110.....0110011"
+    decodes: ["div", "rs1", "rs2", "rd", "rem", "legal"]
+  - instr:  "remu"
+    match: "0000001..........111.....0110011"
+    decodes: ["div", "rs1", "rs2", "rd", "unsign", "rem", "legal"]
