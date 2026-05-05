@@ -49,10 +49,13 @@ module reg_file #(
     /* Read Ports */
     input  logic [REG_FILE_ADDR_WIDTH-1:0] rs1_addr,
     input  logic [REG_FILE_ADDR_WIDTH-1:0] rs2_addr,
+    input  logic [REG_FILE_ADDR_WIDTH-1:0] rs3_addr,
     input  logic                           rs1_rd_en,
     input  logic                           rs2_rd_en,
+    input  logic                           rs3_rd_en,
     output logic [               XLEN-1:0] rs1_data,
     output logic [               XLEN-1:0] rs2_data,
+    output logic [               XLEN-1:0] rs3_data,
 
     /* Write Ports */
     input logic [REG_FILE_ADDR_WIDTH-1:0] rd_addr,
@@ -85,5 +88,6 @@ module reg_file #(
 
   assign rs1_data = (rs1_rd_en) ? reg_file[rs1_addr] : {XLEN{1'b0}};
   assign rs2_data = (rs2_rd_en) ? reg_file[rs2_addr] : {XLEN{1'b0}};
+  assign rs3_data = (rs3_rd_en) ? reg_file[rs3_addr] : {XLEN{1'b0}};
 
 endmodule

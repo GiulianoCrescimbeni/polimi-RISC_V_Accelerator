@@ -72,12 +72,12 @@ module idu1 #(
 
   idu1_out_t idu1_out_i;
   idu1_out_t idu1_out_before_fwd;
-  logic [XLEN-1:0] rs1_data, rs2_data;
+  logic [XLEN-1:0] rs1_data, rs2_data, rs3_data;
   last_issued_instr_t last_issued_instr;
   idu1_out_t idu1_out_gated;
 
-  logic rs1_fwd_idu0, rs2_fwd_idu0;
-  logic rs1_rsb_hit_idu0, rs2_rsb_hit_idu0;
+  logic rs1_fwd_idu0, rs2_fwd_idu0, rs3_fwd_idu0;
+  logic rs1_rsb_hit_idu0, rs2_rsb_hit_idu0, rs3_rsb_hit_idu0;
 
   /* Instantiate Register file */
   reg_file #(
@@ -87,10 +87,13 @@ module idu1 #(
       .rstn     (rstn),
       .rs1_addr (idu0_out.rs1_addr),
       .rs2_addr (idu0_out.rs2_addr),
+      .rs3_addr (idu0_out.rd_addr),
       .rs1_rd_en(idu0_out.rs1 & idu0_out.legal),
       .rs2_rd_en(idu0_out.rs2 & idu0_out.legal),
+      .rs3_rd_en(idu0_out.mac & idu0_out.legal),
       .rs1_data (rs1_data),
       .rs2_data (rs2_data),
+      .rs3_data (rs3_data),
       .rd_addr  (exu_wb_rd_addr),
       .rd_data  (exu_wb_data),
       .rd_wr_en (exu_wb_rd_wr_en)
@@ -105,10 +108,13 @@ module idu1 #(
       .pipe_flush    (pipe_flush),
       .rs1_addr      (idu0_out.rs1_addr),
       .rs2_addr      (idu0_out.rs2_addr),
+      .rs3_addr      (idu0_out.rd_addr),
       .rs1_rd_en     (idu0_out.rs1 & idu0_out.legal),
       .rs2_rd_en     (idu0_out.rs2 & idu0_out.legal),
+      .rs3_rd_en     (idu0_out.mac & idu0_out.legal),
       .rs1_hit       (rs1_rsb_hit_idu0),
       .rs2_hit       (rs2_rsb_hit_idu0),
+      .rs3_hit       (rs3_rsb_hit_idu0),
       .set_rd_addr   (idu0_out.rd_addr),
       .set_rd_wr_en  (idu0_out.legal & (idu0_out.mul | idu0_out.load) & ~(pipe_stall | idu0_rsb_hit_stall)),
       .clear_rd_addr (exu_wb_rd_addr),
@@ -129,10 +135,14 @@ module idu1 #(
   /* WB to IDU1 forwarding */
   assign idu1_out_i.rs1_data = ((exu_wb_rd_addr == idu0_out.rs1_addr) & idu0_out.rs1 & exu_wb_rd_wr_en) ? exu_wb_data : rs1_data;
   assign idu1_out_i.rs2_data = ((exu_wb_rd_addr == idu0_out.rs2_addr) & idu0_out.rs2 & exu_wb_rd_wr_en) ? exu_wb_data : rs2_data;
+  assign idu1_out_i.rs3_data = ((exu_wb_rd_addr == idu0_out.rd_addr)  & idu0_out.mac & exu_wb_rd_wr_en) ? exu_wb_data : rs3_data;
   assign rs1_fwd_idu0 = ((exu_wb_rd_addr == idu0_out.rs1_addr) & idu0_out.rs1 & exu_wb_rd_wr_en);
   assign rs2_fwd_idu0 = ((exu_wb_rd_addr == idu0_out.rs2_addr) & idu0_out.rs2 & exu_wb_rd_wr_en);
+  assign rs3_fwd_idu0 = ((exu_wb_rd_addr == idu0_out.rd_addr)  & idu0_out.mac & exu_wb_rd_wr_en);
 
-  assign idu0_rsb_hit_stall = (rs1_rsb_hit_idu0 & ~rs1_fwd_idu0) | (rs2_rsb_hit_idu0 & ~rs2_fwd_idu0);
+  assign idu0_rsb_hit_stall = (rs1_rsb_hit_idu0 & ~rs1_fwd_idu0) |
+                              (rs2_rsb_hit_idu0 & ~rs2_fwd_idu0) |
+                              (rs3_rsb_hit_idu0 & ~rs3_fwd_idu0);
 
   assign idu1_out_i.alu = idu0_out.alu;
   assign idu1_out_i.rs1 = idu0_out.rs1;
@@ -165,6 +175,7 @@ module idu1 #(
   assign idu1_out_i.half = idu0_out.half;
   assign idu1_out_i.word = idu0_out.word;
   assign idu1_out_i.mul = idu0_out.mul;
+  assign idu1_out_i.mac = idu0_out.mac;
   assign idu1_out_i.rs1_sign = idu0_out.rs1_sign;
   assign idu1_out_i.rs2_sign = idu0_out.rs2_sign;
   assign idu1_out_i.low = idu0_out.low;
@@ -197,6 +208,7 @@ module idu1 #(
         idu1_out_before_fwd.rs2_addr,
         idu1_out_before_fwd.rd_addr,
         idu1_out_before_fwd.mul,
+        idu1_out_before_fwd.mac,
         idu1_out_before_fwd.alu,
         idu1_out_before_fwd.div,
         idu1_out_before_fwd.load,
@@ -217,6 +229,10 @@ module idu1 #(
     /* RS2 */
     if (idu1_out_before_fwd.rs2 & (exu_wb_rd_addr == idu1_out_before_fwd.rs2_addr)) begin
       idu1_out_gated.rs2_data = exu_wb_data;
+    end
+    /* RS3 (MAC accumulator) */
+    if (idu1_out_before_fwd.mac & (exu_wb_rd_addr == idu1_out_before_fwd.rd_addr) & exu_wb_rd_wr_en) begin
+      idu1_out_gated.rs3_data = exu_wb_data;
     end
   end
 

@@ -82,6 +82,7 @@ typedef struct packed {
   logic half;
   logic word;
   logic mul;
+  logic mac;
   logic rs1_sign;
   logic rs2_sign;
   logic low;
@@ -98,6 +99,7 @@ typedef struct packed {
   logic [XLEN-1:0]         instr_tag;
   logic [XLEN-1:0]         rs1_data;
   logic [XLEN-1:0]         rs2_data;
+  logic [XLEN-1:0]         rs3_data;
   logic [4:0]              rs1_addr;
   logic [4:0]              rs2_addr;
   logic [XLEN-1:0]         imm;
@@ -137,6 +139,7 @@ typedef struct packed {
   logic half;
   logic word;
   logic mul;
+  logic mac;
   logic rs1_sign;
   logic rs2_sign;
   logic low;
@@ -154,6 +157,7 @@ typedef struct packed {
   logic [4:0] rs2_addr;
   logic [4:0] rd_addr;
   logic mul;
+  logic mac;
   logic alu;
   logic div;
   logic load;

@@ -97,8 +97,35 @@ module core_top_tb;
 
 
   logic [31:0] cycle_count_last_retired = 0;
+
+  /* Dump final DCCM memory range to rtl.state when the program terminates.
+   * Range is configured via +plusargs:
+   *   +STATE_DUMP_BASE=<byte_addr>   (default: 0x00100000)
+   *   +STATE_DUMP_WORDS=<count>      (default: 0, no dump)
+   * The dump format matches the ISS state file: one "mem[0xADDR]=0xVALUE" per line. */
+  function automatic void dump_final_state();
+    int fd_state;
+    int unsigned base_addr;
+    int unsigned num_words;
+    int unsigned word_idx;
+    base_addr = 32'h00100000;
+    num_words = 0;
+    void'($value$plusargs("STATE_DUMP_BASE=%h", base_addr));
+    void'($value$plusargs("STATE_DUMP_WORDS=%d", num_words));
+    if (num_words == 0) return;
+    fd_state = $fopen("rtl.state", "w");
+    for (int unsigned i = 0; i < num_words; i++) begin
+      word_idx = ((base_addr - 32'h00100000) >> 2) + i;
+      $fdisplay(fd_state, "mem[0x%08h]=0x%08h",
+                base_addr + (i << 2),
+                core_top_i.dccm_inst.mem[word_idx]);
+    end
+    $fclose(fd_state);
+  endfunction
+
   always_ff @(posedge clk) begin
     if (finish_seq_detected) begin
+      dump_final_state();
       $finish;
     end
     if (cycle_count_last_retired > 10000) begin

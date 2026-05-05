@@ -634,7 +634,20 @@ class RISC_V_ISS:
                 self.mem.write_word(addr, word)
                 addr += 4
     
-    def run(self, elf_file: str, output_file: str, hex_file: Optional[str] = None):
+    def dump_state(self, state_file: str, base_addr: int, words: int):
+        """Dump final memory state (word-aligned) to a file.
+
+        Format per line: mem[0xADDR]=0xVALUE  (matching RTL state dump format)
+        """
+        with open(state_file, 'w') as f:
+            for i in range(words):
+                addr = (base_addr + i * 4) & 0xFFFFFFFF
+                val = self.mem.read_word(addr)
+                f.write(f"mem[0x{addr:08X}]=0x{val:08X}\n")
+
+    def run(self, elf_file: str, output_file: str, hex_file: Optional[str] = None,
+            state_file: Optional[str] = None, state_base: int = 0x100000,
+            state_words: int = 0):
         """Load ELF and execute instructions"""
         # Load hex file first (preload data memory)
         if hex_file:
@@ -736,6 +749,10 @@ class RISC_V_ISS:
         with open(output_file, 'w') as f:
             f.write('\n'.join(trace_lines))
 
+        # Dump final memory state, if requested
+        if state_file is not None and state_words > 0:
+            self.dump_state(state_file, state_base, state_words)
+
 def main():
     parser = argparse.ArgumentParser(
         description='RISC-V Instruction Set Simulator (RV32I)',
@@ -787,11 +804,37 @@ Examples:
         metavar='HEX_FILE',
         help='Hex file to preload data memory (one 32-bit word per line, starting at address 0x0)'
     )
-    
+
+    parser.add_argument(
+        '--state-file',
+        default=None,
+        metavar='STATE_FILE',
+        help='If set, dump the final memory state (word range) to this file at end of execution'
+    )
+
+    parser.add_argument(
+        '--state-base',
+        type=lambda x: int(x, 16),
+        default=0x100000,
+        metavar='STATE_BASE',
+        help='Base byte address of the state-dump range (default: 0x100000)'
+    )
+
+    parser.add_argument(
+        '--state-words',
+        type=lambda x: int(x, 0),
+        default=0,
+        metavar='STATE_WORDS',
+        help='Number of 32-bit words to dump from STATE_BASE (0 disables, default: 0)'
+    )
+
     args = parser.parse_args()
-    
+
     iss = RISC_V_ISS(args.text_start, args.stack_base, args.stack_size)
-    iss.run(args.elf_file, args.output, args.mem_file)
+    iss.run(args.elf_file, args.output, args.mem_file,
+            state_file=args.state_file,
+            state_base=args.state_base,
+            state_words=args.state_words)
 
 
 if __name__ == '__main__':

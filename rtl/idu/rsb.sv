@@ -51,11 +51,14 @@ module rsb #(
     /* Read Ports */
     input logic [$clog2(N_REG)-1:0] rs1_addr,
     input logic [$clog2(N_REG)-1:0] rs2_addr,
+    input logic [$clog2(N_REG)-1:0] rs3_addr,
     input logic                     rs1_rd_en,
     input logic                     rs2_rd_en,
+    input logic                     rs3_rd_en,
 
     output logic rs1_hit,
     output logic rs2_hit,
+    output logic rs3_hit,
 
     /* Write Ports */
     input logic [$clog2(N_REG)-1:0] set_rd_addr,
@@ -91,5 +94,6 @@ module rsb #(
 
   assign rs1_hit = (rs1_rd_en) ? rsb[rs1_addr] : 1'b0;
   assign rs2_hit = (rs2_rd_en) ? rsb[rs2_addr] : 1'b0;
+  assign rs3_hit = (rs3_rd_en) ? rsb[rs3_addr] : 1'b0;
 
 endmodule

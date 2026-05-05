@@ -30,6 +30,7 @@ typedef struct packed {
 	logic half;
 	logic word;
 	logic mul;
+	logic mac;
 	logic rs1_sign;
 	logic rs2_sign;
 	logic low;

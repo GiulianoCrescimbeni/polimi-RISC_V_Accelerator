@@ -79,6 +79,10 @@ module mul (
   logic [XLEN-1:0] instr_tag_e1, instr_tag_e2, instr_tag_e3;
   logic [31:0] instr_e1, instr_e2, instr_e3;
 
+  /* MAC accumulator pipeline */
+  logic [XLEN-1:0] rs3_data_e1, rs3_data_e2, rs3_data_e3;
+  logic            mac_e1, mac_e2, mac_e3;
+
   assign a = mul_ctrl.rs1_data;
   assign b = mul_ctrl.rs2_data;
 
@@ -162,6 +166,24 @@ module mul (
       .dout({instr_tag_e1, instr_e1})
   );
 
+  register_sync_rstn #(
+      .WIDTH(XLEN)
+  ) rs3_e1_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (mul_ctrl.rs3_data),
+      .dout(rs3_data_e1)
+  );
+
+  register_sync_rstn #(
+      .WIDTH(1)
+  ) mac_e1_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (mul_ctrl.legal & mul_ctrl.mac),
+      .dout(mac_e1)
+  );
+
 
   // --------------------------- E1 Logic Stage ----------------------------------
 
@@ -233,6 +255,24 @@ module mul (
       .dout({instr_tag_e2, instr_e2})
   );
 
+  register_sync_rstn #(
+      .WIDTH(XLEN)
+  ) rs3_e2_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (rs3_data_e1),
+      .dout(rs3_data_e2)
+  );
+
+  register_sync_rstn #(
+      .WIDTH(1)
+  ) mac_e2_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (mac_e1),
+      .dout(mac_e2)
+  );
+
 
   // ---------------------- E2 Logic Stage --------------------------
 
@@ -284,9 +324,29 @@ module mul (
       .din ({instr_tag_e2, instr_e2}),
       .dout({instr_tag_e3, instr_e3})
   );
+
+  register_sync_rstn #(
+      .WIDTH(XLEN)
+  ) rs3_e3_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (rs3_data_e2),
+      .dout(rs3_data_e3)
+  );
+
+  register_sync_rstn #(
+      .WIDTH(1)
+  ) mac_e3_ff (
+      .clk (clk),
+      .rstn(rstn),
+      .din (mac_e2),
+      .dout(mac_e3)
+  );
   // ----------------------- E3 Logic Stage -------------------------
 
-  assign out[XLEN-1:0] = low_e3 ? prod_e3[XLEN-1:0] : prod_e3[2*XLEN-1:XLEN];
+  logic [XLEN-1:0] mul_result;
+  assign mul_result    = low_e3 ? prod_e3[XLEN-1:0] : prod_e3[2*XLEN-1:XLEN];
+  assign out[XLEN-1:0] = mac_e3 ? (mul_result + rs3_data_e3) : mul_result;
   assign out_rd_wr_en = out_rd_wr_en_e3;
   assign out_rd_addr = out_rd_addr_e3;
 

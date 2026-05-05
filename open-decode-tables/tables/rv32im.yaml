@@ -35,12 +35,14 @@ output:
         "half",
         "word",
         "mul",
+        "mac",
         "rs1_sign",
         "rs2_sign",
         "low",
         "div",
         "rem",
         "nop",
+        "ecall",
         "legal"
       ]
 decodes:
@@ -182,3 +184,9 @@ decodes:
   - instr:  "remu"
     match: "0000001..........111.....0110011"
     decodes: ["div", "rs1", "rs2", "rd", "unsign", "rem", "legal"]
+  - instr:  "ecall"
+    match: "00000000000000000000000001110011"
+    decodes: ["ecall", "legal"]
+  - instr:  "mac"
+    match: "0000001..........100.....0001011"
+    decodes: ["mul", "mac", "rs1", "rs2", "rd", "low", "legal"]
