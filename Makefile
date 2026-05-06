@@ -17,7 +17,10 @@ clean:
 SIM ?= verilator
 TEST_DIR = tools/sim_manager.py
 
-.PHONY: test
+.PHONY: test sim sim-mac
+
+#- Base: make sim T=c.mac_test                                                                                                   
+#- MAC Acceleration (dual pipeline): make sim-mac T=mac_test 
 
 sim:
 	@if [ -z "$(T)" ]; then \
@@ -26,6 +29,18 @@ sim:
 		case "$(T)" in \
 			*.*) FINAL_T="$(T)" ;; \
 			*)   FINAL_T="asm.$(T)" ;; \
+		esac; \
+		python3 $(TEST_DIR) -n $$FINAL_T -s $(SIM); \
+	fi
+
+sim-mac:
+	@if [ -z "$(T)" ]; then \
+		echo "Error: Specify a C program. Example: make sim-mac T=mac_test"; \
+	else \
+		case "$(T)" in \
+			cdual.*) FINAL_T="$(T)" ;; \
+			*.*)     FINAL_T="cdual.$${T#*.}" ;; \
+			*)       FINAL_T="cdual.$(T)" ;; \
 		esac; \
 		python3 $(TEST_DIR) -n $$FINAL_T -s $(SIM); \
 	fi

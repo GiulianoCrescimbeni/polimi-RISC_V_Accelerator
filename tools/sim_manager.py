@@ -36,7 +36,7 @@ def run_gen(test: str) -> None:
         if extension == ".s":
             os.system(f"riscv64-unknown-elf-gcc -O0 -I{os.path.join('tests', test_path[0])} -march=rv32im -mabi=ilp32 -o work/{test}/test.elf -nostdlib {os.path.join('tests', test_path[0], test_path[1] + extension)} -Wl,-Ttext=0x100000 > {os.path.join('work', test, 'compile.log')}")
         elif extension == ".c":
-            os.system(f"riscv64-unknown-elf-gcc -O0 -I{os.path.join('tests', test_path[0])} -march=rv32im -mabi=ilp32 -o work/{test}/test.elf -fno-builtin-printf -fno-common -falign-functions=4 {os.path.join('tests', test_path[0], test_path[1] + extension)} {os.path.join('tests', test_path[0], 'lib', 'vedas_printf.o')} {os.path.join('tests', test_path[0], 'asm_functions', 'eot_sequence.s')} $LOADLIBES $LDLIBS -lm -Wl,-Ttext=0x100000 > {os.path.join('work', test, 'compile.log')}")
+            os.system(f"riscv64-unknown-elf-gcc -O2 -I{os.path.join('tests', test_path[0])} -march=rv32im -mabi=ilp32 -o work/{test}/test.elf -fno-builtin-printf -fno-common -falign-functions=4 {os.path.join('tests', test_path[0], test_path[1] + extension)} {os.path.join('tests', test_path[0], 'lib', 'vedas_printf.o')} {os.path.join('tests', test_path[0], 'asm_functions', 'eot_sequence.s')} $LOADLIBES $LDLIBS -lm -Wl,-Ttext=0x100000 > {os.path.join('work', test, 'compile.log')}")
         else:
             os.system(f"cp {os.path.join('tests', test_path[0], test_path[1])} work/{test}/test.elf")
 
@@ -424,7 +424,7 @@ def run_gen_dual(test: str):
     # Match the existing C-test compile flags (default crt0 provides _start);
     # we deliberately do NOT link vedas_printf.o here because the dual flow
     # verifies via globals, not UART writes.
-    common_flags = (f"-O0 -I{inc_dir} -march=rv32im -mabi=ilp32 "
+    common_flags = (f"-O2 -I{inc_dir} -march=rv32im -mabi=ilp32 "
                     "-fno-builtin-printf -fno-common -falign-functions=4")
     ld_flags = (f"-Wl,-Ttext=0x100000 -Wl,-Tdata=0x{DUAL_TDATA:X}")
 
@@ -445,20 +445,24 @@ def run_gen_dual(test: str):
     os.system(f"riscv64-unknown-elf-objdump -D {iss_elf} > {iss_elf}.dump")
     os.system(f"riscv64-unknown-elf-objdump -D {rtl_elf} > {rtl_elf}.dump")
 
-    # Reset vector (address of _start) — same in both ELFs since .text is at 0x100000
-    with open(iss_elf, "rb") as f:
-        elf = ELFFile(f)
-        symtab = elf.get_section_by_name('.symtab')
-        if symtab is None:
-            raise RuntimeError("No symbol table in ELF")
-        reset_vector = None
-        for sym in symtab.iter_symbols():
-            if sym.name == "_start":
-                reset_vector = sym['st_value']
-                break
-        if reset_vector is None:
-            raise RuntimeError("No _start symbol in ELF")
-    return reset_vector, iss_elf, rtl_elf
+    # Reset vector (address of _start) is read from each ELF independently:
+    # at -O2 the two .text sections differ in size (custom MAC = 1 insn vs
+    # MUL+ADD = 2 insns), so _start lands at different addresses and a single
+    # shared reset vector would boot one of the runs in the middle of _start.
+    def _read_start(elf_path: str) -> int:
+        with open(elf_path, "rb") as f:
+            elf = ELFFile(f)
+            symtab = elf.get_section_by_name('.symtab')
+            if symtab is None:
+                raise RuntimeError(f"No symbol table in {elf_path}")
+            for sym in symtab.iter_symbols():
+                if sym.name == "_start":
+                    return sym['st_value']
+        raise RuntimeError(f"No _start symbol in {elf_path}")
+
+    iss_reset = _read_start(iss_elf)
+    rtl_reset = _read_start(rtl_elf)
+    return iss_reset, rtl_reset, iss_elf, rtl_elf
 
 
 def compute_state_range(elf_path: str):
@@ -677,16 +681,18 @@ def run_e2e_dual(test: str, simulator: str):
     """Dual-ELF pipeline: ISS on no-MAC ELF, RTL on MAC ELF, compare final
     memory state of .data/.bss/.rodata."""
     try:
-        reset_vector, iss_elf, rtl_elf = run_gen_dual(test)
+        iss_reset, rtl_reset, iss_elf, rtl_elf = run_gen_dual(test)
         state_base, state_words = compute_state_range(iss_elf)
-        run_iss_dual(test, reset_vector, iss_elf, state_base, state_words)
+        run_iss_dual(test, iss_reset, iss_elf, state_base, state_words)
         prepare_imem_dual(test, rtl_elf)
         if simulator == "verilator":
-            run_verilator_dual(test, reset_vector, state_base, state_words)
+            run_verilator_dual(test, rtl_reset, state_base, state_words)
         else:
-            run_xsim_dual(test, reset_vector, state_base, state_words)
+            run_xsim_dual(test, rtl_reset, state_base, state_words)
         # The RTL run drops rtl.state in work/<test>/ (cwd of the simulator).
         compare_final_state(test)
+        process_rtl_log(test)
+        calculate_perf_stats(test)
     except Exception as e:
         print(f"Error running dual test {test}: {e}")
         print(traceback.format_exc())
