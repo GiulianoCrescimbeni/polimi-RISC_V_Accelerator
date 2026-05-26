@@ -8,7 +8,7 @@
      * expected — what matters here is work/asm.mac_bench_mac/stats.txt, which
      * comes from the RTL log alone.
      *
-     *   x12 += x10 * x11    repeated 1024 times via custom MAC
+     *   x12 += x10 * x11    repeated 100000 times via custom MAC
      */
     .globl   _start
     .section .text
@@ -17,7 +17,7 @@ _start:
     li       x10, 7              # const a
     li       x11, 6              # const b
     li       x12, 0              # accumulator
-    li       x13, 1024           # iteration count
+    li       x13, 100000         # iteration count
     li       x14, 0              # i
 
 loop_mac:
