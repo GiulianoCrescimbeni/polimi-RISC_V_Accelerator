@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//     Copyright (c) 2025 Siliscale Consulting, LLC
+//     Copyright (c) 2026 Giuliano Crescimbeni
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -13,27 +13,11 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-//           _____
-//          /\    \
-//         /::\    \
-//        /::::\    \
-//       /::::::\    \
-//      /:::/\:::\    \
-//     /:::/__\:::\    \            Vendor      : Siliscale
-//     \:::\   \:::\    \           Version     : 2025.1
-//   ___\:::\   \:::\    \          Description : Tiny Vedas - QUAD MAC (SIMD INT8)
-//  /\   \:::\   \:::\    \
-// /::\   \:::\   \:::\____\
-// \:::\   \:::\   \::/    /
-//  \:::\   \:::\   \/____/
-//   \:::\   \:::\    \
-//    \:::\   \:::\____\
-//     \:::\  /:::/    /
-//      \:::\/:::/    /
-//       \::::::/    /
-//        \::::/    /
-//         \::/    /
-//          \/____/
+//    Description : Tiny Vedas - QUAD MAC (SIMD INT8)
+//    Author      : Giuliano Crescimbeni - Politecnico di Milano (ACA)
+//
+//    Original addition to the Tiny-Vedas RV32IM core
+//    (base project (c) 2025 Siliscale Consulting, LLC, Apache-2.0).
 ///////////////////////////////////////////////////////////////////////////////
 //
 // Single-cycle combinational Quad-MAC (SIMD) functional unit.
