@@ -18,6 +18,7 @@ $PROJ/rtl/idu/rsb.sv
 $PROJ/rtl/exu/exu.sv
 $PROJ/rtl/exu/alu.sv
 $PROJ/rtl/exu/mul.sv
+$PROJ/rtl/exu/qmac.sv
 $PROJ/rtl/exu/div.sv
 $PROJ/rtl/exu/lsu.sv
 $PROJ/rtl/idu/reg_file.sv

@@ -176,6 +176,7 @@ module idu1 #(
   assign idu1_out_i.word = idu0_out.word;
   assign idu1_out_i.mul = idu0_out.mul;
   assign idu1_out_i.mac = idu0_out.mac;
+  assign idu1_out_i.qmac = idu0_out.qmac;
   assign idu1_out_i.rs1_sign = idu0_out.rs1_sign;
   assign idu1_out_i.rs2_sign = idu0_out.rs2_sign;
   assign idu1_out_i.low = idu0_out.low;

@@ -36,6 +36,7 @@ output:
         "word",
         "mul",
         "mac",
+        "qmac",
         "rs1_sign",
         "rs2_sign",
         "low",
@@ -190,3 +191,6 @@ decodes:
   - instr:  "mac"
     match: "0000001..........100.....0001011"
     decodes: ["mul", "mac", "rs1", "rs2", "rd", "low", "legal"]
+  - instr:  "qmac"
+    match: "0000001..........101.....0001011"
+    decodes: ["qmac", "mac", "rs1", "rs2", "rd", "legal"]

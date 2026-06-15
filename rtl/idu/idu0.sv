@@ -126,6 +126,7 @@ module idu0 (
   assign idu0_out_i.word = decode_out.word;
   assign idu0_out_i.mul = decode_out.mul;
   assign idu0_out_i.mac = decode_out.mac;
+  assign idu0_out_i.qmac = decode_out.qmac;
   assign idu0_out_i.rs1_sign = decode_out.rs1_sign;
   assign idu0_out_i.rs2_sign = decode_out.rs2_sign;
   assign idu0_out_i.low = decode_out.low;
