@@ -86,9 +86,9 @@ module exu (
   logic [REG_FILE_ADDR_WIDTH-1:0] mul_wb_rd_addr;
   logic                           mul_wb_rd_wr_en;
 
-  logic [               XLEN-1:0] qmac_wb_data;
-  logic [REG_FILE_ADDR_WIDTH-1:0] qmac_wb_rd_addr;
-  logic                           qmac_wb_rd_wr_en;
+  logic [               XLEN-1:0] mac_8_wb_data;
+  logic [REG_FILE_ADDR_WIDTH-1:0] mac_8_wb_rd_addr;
+  logic                           mac_8_wb_rd_wr_en;
 
   logic [               XLEN-1:0] div_wb_data;
   logic [REG_FILE_ADDR_WIDTH-1:0] div_wb_rd_addr;
@@ -105,8 +105,8 @@ module exu (
   logic [          INSTR_LEN-1:0] alu_instr_out;
   logic [               XLEN-1:0] mul_instr_tag_out;
   logic [          INSTR_LEN-1:0] mul_instr_out;
-  logic [               XLEN-1:0] qmac_instr_tag_out;
-  logic [          INSTR_LEN-1:0] qmac_instr_out;
+  logic [               XLEN-1:0] mac_8_instr_tag_out;
+  logic [          INSTR_LEN-1:0] mac_8_instr_out;
   logic [               XLEN-1:0] div_instr_tag_out;
   logic [          INSTR_LEN-1:0] div_instr_out;
   logic [               XLEN-1:0] lsu_instr_tag_out;
@@ -140,15 +140,15 @@ module exu (
       .mul_busy     (exu_mul_busy)
   );
 
-  qmac qmac_inst (
+  mac_8 mac_8_inst (
       .clk             (clk),
       .rstn            (rstn),
-      .qmac_ctrl       (idu1_out),
-      .qmac_wb_data    (qmac_wb_data),
-      .qmac_wb_rd_addr (qmac_wb_rd_addr),
-      .qmac_wb_rd_wr_en(qmac_wb_rd_wr_en),
-      .instr_tag_out   (qmac_instr_tag_out),
-      .instr_out       (qmac_instr_out)
+      .mac_8_ctrl       (idu1_out),
+      .mac_8_wb_data    (mac_8_wb_data),
+      .mac_8_wb_rd_addr (mac_8_wb_rd_addr),
+      .mac_8_wb_rd_wr_en(mac_8_wb_rd_wr_en),
+      .instr_tag_out   (mac_8_instr_tag_out),
+      .instr_out       (mac_8_instr_out)
   );
 
   div div_inst (
@@ -200,29 +200,29 @@ module exu (
 
   assign exu_wb_data = ({XLEN{alu_wb_rd_wr_en}} & alu_wb_data) |
                        ({XLEN{mul_wb_rd_wr_en}} & mul_wb_data) |
-                       ({XLEN{qmac_wb_rd_wr_en}} & qmac_wb_data) |
+                       ({XLEN{mac_8_wb_rd_wr_en}} & mac_8_wb_data) |
                        ({XLEN{div_wb_rd_wr_en}} & div_wb_data) |
                        ({XLEN{lsu_wb_rd_wr_en}} & lsu_wb_data);
 
   assign exu_wb_rd_addr = ({REG_FILE_ADDR_WIDTH{alu_wb_rd_wr_en}} & alu_wb_rd_addr) |
                           ({REG_FILE_ADDR_WIDTH{mul_wb_rd_wr_en}} & mul_wb_rd_addr) |
-                          ({REG_FILE_ADDR_WIDTH{qmac_wb_rd_wr_en}} & qmac_wb_rd_addr) |
+                          ({REG_FILE_ADDR_WIDTH{mac_8_wb_rd_wr_en}} & mac_8_wb_rd_addr) |
                           ({REG_FILE_ADDR_WIDTH{div_wb_rd_wr_en}} & div_wb_rd_addr) |
                           ({REG_FILE_ADDR_WIDTH{lsu_wb_rd_wr_en}} & lsu_wb_rd_addr);
 
-  assign exu_wb_rd_wr_en = alu_wb_rd_wr_en | mul_wb_rd_wr_en | qmac_wb_rd_wr_en | div_wb_rd_wr_en | lsu_wb_rd_wr_en;
+  assign exu_wb_rd_wr_en = alu_wb_rd_wr_en | mul_wb_rd_wr_en | mac_8_wb_rd_wr_en | div_wb_rd_wr_en | lsu_wb_rd_wr_en;
 
   /* ONLY FOR DEBUG */
   assign instr_tag_out = ({XLEN{alu_wb_rd_wr_en}} & alu_instr_tag_out) |
                          ({XLEN{mul_wb_rd_wr_en}} & mul_instr_tag_out) |
-                         ({XLEN{qmac_wb_rd_wr_en}} & qmac_instr_tag_out) |
+                         ({XLEN{mac_8_wb_rd_wr_en}} & mac_8_instr_tag_out) |
                          ({XLEN{div_wb_rd_wr_en}} & div_instr_tag_out) |
                          ({XLEN{lsu_wb_rd_wr_en}} & lsu_instr_tag_out) |
                          ({XLEN{ecall_exe}} & ecall_instr_tag_out);
 
   assign instr_out = ({INSTR_LEN{alu_wb_rd_wr_en}} & alu_instr_out) |
                      ({INSTR_LEN{mul_wb_rd_wr_en}} & mul_instr_out) |
-                     ({INSTR_LEN{qmac_wb_rd_wr_en}} & qmac_instr_out) |
+                     ({INSTR_LEN{mac_8_wb_rd_wr_en}} & mac_8_instr_out) |
                      ({INSTR_LEN{div_wb_rd_wr_en}} & div_instr_out) |
                      ({INSTR_LEN{lsu_wb_rd_wr_en}} & lsu_instr_out) |
                      ({INSTR_LEN{ecall_exe}} & ecall_instr_out) ;

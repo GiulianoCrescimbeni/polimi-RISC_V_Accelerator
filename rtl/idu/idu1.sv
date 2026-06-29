@@ -176,7 +176,7 @@ module idu1 #(
   assign idu1_out_i.word = idu0_out.word;
   assign idu1_out_i.mul = idu0_out.mul;
   assign idu1_out_i.mac = idu0_out.mac;
-  assign idu1_out_i.qmac = idu0_out.qmac;
+  assign idu1_out_i.mac_8 = idu0_out.mac_8;
   assign idu1_out_i.rs1_sign = idu0_out.rs1_sign;
   assign idu1_out_i.rs2_sign = idu0_out.rs2_sign;
   assign idu1_out_i.low = idu0_out.low;
@@ -250,10 +250,25 @@ module idu1 #(
       pipe_stall = exu_mul_busy;
     end else if (last_issued_instr.div) begin
       pipe_stall = exu_div_busy;
-    end else if (last_issued_instr.load & (idu1_out_gated.legal & ~idu1_out_gated.load)) begin /* Pipeline Loads */ 
+    end else if (last_issued_instr.load & (idu1_out_gated.legal & ~idu1_out_gated.load)) begin /* Pipeline Loads */
       pipe_stall = exu_lsu_busy;
     end else if (last_issued_instr.store & (idu1_out_gated.legal & ~idu1_out_gated.store)) begin /* Pipeline Stores */
       pipe_stall = exu_lsu_busy;
+    end
+    /* Write-back port arbitration.
+       A load writes back from the LSU's DC3 stage (EX+3), whereas a single-cycle
+       ALU/mac_8 writes back at EX+1. The EXU write-back bus is an OR of every
+       functional unit, so if both fire on the same cycle the destination addr
+       and data are corrupted. exu_lsu_busy is asserted while a load is still in
+       DC1/DC2 (i.e. it has not yet written back); holding any single-cycle
+       writer (ALU or mac_8) in EX until exu_lsu_busy clears guarantees the load
+       owns the write-back port alone the cycle it commits. The LSU pipeline is
+       not frozen by pipe_stall, so in-flight loads always drain and this cannot
+       deadlock. (Without this, dense load + ALU/mac_8 loops such as the INT8
+       conv2d kernel intermittently corrupt a register and hang the LSU.) */
+    if ((idu1_out_gated.alu | idu1_out_gated.mac_8) & idu1_out_gated.rd &
+        idu1_out_gated.legal & exu_lsu_busy) begin
+      pipe_stall = 1'b1;
     end
     pipe_stall |= exu_lsu_stall;
   end

@@ -83,7 +83,7 @@ typedef struct packed {
   logic word;
   logic mul;
   logic mac;
-  logic qmac;
+  logic mac_8;
   logic rs1_sign;
   logic rs2_sign;
   logic low;
@@ -141,7 +141,7 @@ typedef struct packed {
   logic word;
   logic mul;
   logic mac;
-  logic qmac;
+  logic mac_8;
   logic rs1_sign;
   logic rs2_sign;
   logic low;

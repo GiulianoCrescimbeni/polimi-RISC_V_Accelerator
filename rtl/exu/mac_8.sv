@@ -13,14 +13,14 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-//    Description : Tiny Vedas - QUAD MAC (SIMD INT8)
+//    Description : Tiny Vedas - mac_8 (SIMD INT8)
 //    Author      : Giuliano Crescimbeni - Politecnico di Milano (ACA)
 //
 //    Original addition to the Tiny-Vedas RV32IM core
 //    (base project (c) 2025 Siliscale Consulting, LLC, Apache-2.0).
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Single-cycle combinational Quad-MAC (SIMD) functional unit.
+// Single-cycle combinational mac_8 (SIMD) functional unit.
 //
 //   rd <- sat32( rd + SUM_{i=0..3} rs1[8i+7:8i] * rs2[8i+7:8i] )
 //
@@ -44,34 +44,34 @@
 `include "types.svh"
 `endif
 
-module qmac (
+module mac_8 (
 
     input logic clk,
     input logic rstn,
 
-    input idu1_out_t qmac_ctrl,
+    input idu1_out_t mac_8_ctrl,
 
     output logic [XLEN-1:0] instr_tag_out,
     output logic [    31:0] instr_out,
 
-    output logic [XLEN-1:0] qmac_wb_data,
-    output logic [     4:0] qmac_wb_rd_addr,
-    output logic            qmac_wb_rd_wr_en
+    output logic [XLEN-1:0] mac_8_wb_data,
+    output logic [     4:0] mac_8_wb_rd_addr,
+    output logic            mac_8_wb_rd_wr_en
 );
 
   /* Unpack the four signed 8-bit lanes from each source operand */
   logic signed [7:0] a0, a1, a2, a3;
   logic signed [7:0] b0, b1, b2, b3;
 
-  assign a0 = qmac_ctrl.rs1_data[7:0];
-  assign a1 = qmac_ctrl.rs1_data[15:8];
-  assign a2 = qmac_ctrl.rs1_data[23:16];
-  assign a3 = qmac_ctrl.rs1_data[31:24];
+  assign a0 = mac_8_ctrl.rs1_data[7:0];
+  assign a1 = mac_8_ctrl.rs1_data[15:8];
+  assign a2 = mac_8_ctrl.rs1_data[23:16];
+  assign a3 = mac_8_ctrl.rs1_data[31:24];
 
-  assign b0 = qmac_ctrl.rs2_data[7:0];
-  assign b1 = qmac_ctrl.rs2_data[15:8];
-  assign b2 = qmac_ctrl.rs2_data[23:16];
-  assign b3 = qmac_ctrl.rs2_data[31:24];
+  assign b0 = mac_8_ctrl.rs2_data[7:0];
+  assign b1 = mac_8_ctrl.rs2_data[15:8];
+  assign b2 = mac_8_ctrl.rs2_data[23:16];
+  assign b3 = mac_8_ctrl.rs2_data[31:24];
 
   /* Four parallel 8x8 signed multipliers -> four 16-bit partial products */
   logic signed [15:0] p0, p1, p2, p3;
@@ -89,31 +89,31 @@ module qmac (
   /* Accumulate onto the 32-bit signed accumulator (rs3_data == old rd).
      Done on 33 bits (sign-extended operands) to expose a signed 32-bit overflow. */
   logic signed [XLEN:0] acc;
-  assign acc = 33'($signed(qmac_ctrl.rs3_data)) + 33'(dot);
+  assign acc = 33'($signed(mac_8_ctrl.rs3_data)) + 33'(dot);
 
   /* Saturation to the signed 32-bit range */
   localparam logic signed [XLEN:0] SAT_MAX = 33'sd2147483647;   //  0x7FFFFFFF
   localparam logic signed [XLEN:0] SAT_MIN = -33'sd2147483648;  // -0x80000000
 
-  logic [XLEN-1:0] qmac_wb_data_i;
-  assign qmac_wb_data_i = (acc > SAT_MAX) ? 32'h7FFFFFFF :
+  logic [XLEN-1:0] mac_8_wb_data_i;
+  assign mac_8_wb_data_i = (acc > SAT_MAX) ? 32'h7FFFFFFF :
                           (acc < SAT_MIN) ? 32'h80000000 :
                           acc[XLEN-1:0];
 
-  logic [4:0] qmac_wb_rd_addr_i;
-  logic       qmac_wb_rd_wr_en_i;
+  logic [4:0] mac_8_wb_rd_addr_i;
+  logic       mac_8_wb_rd_wr_en_i;
 
-  assign qmac_wb_rd_addr_i  = qmac_ctrl.rd_addr;
-  assign qmac_wb_rd_wr_en_i = qmac_ctrl.qmac & qmac_ctrl.legal & qmac_ctrl.rd & ~qmac_ctrl.nop;
+  assign mac_8_wb_rd_addr_i  = mac_8_ctrl.rd_addr;
+  assign mac_8_wb_rd_wr_en_i = mac_8_ctrl.mac_8 & mac_8_ctrl.legal & mac_8_ctrl.rd & ~mac_8_ctrl.nop;
 
   /* Single output flop -> write-back at EX+1, identical timing to the ALU */
   register_sync_rstn #(
-      .WIDTH($bits({qmac_wb_data_i, qmac_wb_rd_addr_i, qmac_wb_rd_wr_en_i}))
-  ) qmac_wb_data_ff (
+      .WIDTH($bits({mac_8_wb_data_i, mac_8_wb_rd_addr_i, mac_8_wb_rd_wr_en_i}))
+  ) mac_8_wb_data_ff (
       .clk (clk),
       .rstn(rstn),
-      .din ({qmac_wb_data_i, qmac_wb_rd_addr_i, qmac_wb_rd_wr_en_i}),
-      .dout({qmac_wb_data, qmac_wb_rd_addr, qmac_wb_rd_wr_en})
+      .din ({mac_8_wb_data_i, mac_8_wb_rd_addr_i, mac_8_wb_rd_wr_en_i}),
+      .dout({mac_8_wb_data, mac_8_wb_rd_addr, mac_8_wb_rd_wr_en})
   );
 
   register_sync_rstn #(
@@ -121,7 +121,7 @@ module qmac (
   ) instr_tag_ff (
       .clk (clk),
       .rstn(rstn),
-      .din ({qmac_ctrl.instr_tag, qmac_ctrl.instr}),
+      .din ({mac_8_ctrl.instr_tag, mac_8_ctrl.instr}),
       .dout({instr_tag_out, instr_out})
   );
 

@@ -691,7 +691,7 @@ class RISC_V_ISS:
         
         # Execute instructions
         trace_lines = []
-        max_instructions = 1000000  # Safety limit
+        max_instructions = 50000000  # Safety limit (raised: INT8 conv scalar golden model exceeds 1M instrs)
         instruction_count = 0
         
         while instruction_count < max_instructions:

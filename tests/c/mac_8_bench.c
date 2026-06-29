@@ -1,28 +1,29 @@
 /*
- * Quad-MAC performance benchmark — INT8 dot-product kernel.
+ * mac_8 performance benchmark — INT8 dot-product kernel.
  *
  * A/B compared on the RTL across two builds:
- *   make sim     T=c.qmac_bench  -> without USE_MAC_INSN, qmac() = scalar C
+ *   make sim     T=c.mac_8_bench  -> without USE_MAC_INSN, mac_8() = scalar C
  *                                   (4 unpacks + 4 MUL + adds + saturation)
- *   make sim-mac T=qmac_bench    -> with    USE_MAC_INSN, qmac() = custom QMAC
+ *   make sim-mac T=mac_8_bench    -> with    USE_MAC_INSN, mac_8() = custom mac_8
  *                                   (one single-cycle instruction)
- * Diff work/c.qmac_bench/stats.txt vs work/cdual.qmac_bench/stats.txt.
+ * Diff work/c.mac_8_bench/stats.txt vs work/cdual.mac_8_bench/stats.txt.
  *
  * Kernel: REPS outer iterations of a length-N packed-INT8 dot product,
  * accumulating into a single register.  Each element holds four signed 8-bit
- * lanes, so one qmac() call does four INT8 MACs.  Values are kept small so the
+ * lanes, so one mac_8() call does four INT8 MACs.  Values are kept small so the
  * accumulator never saturates and both builds compute the identical result.
  *
- * Sizing: N=64, REPS=256 -> 16384 qmac() calls x 4 lanes = 65536 INT8
- * MAC-equivalent operations, i.e. exactly the same amount of multiply-
- * accumulate work as the scalar C mac_bench (N=64, REPS=1024 = 65536 scalar
- * MACs). The two are therefore directly comparable, side by side.
+ * Sizing (mac/bit fairness): a mac_8 and a 32-bit MAC each move 64 operand bits
+ * per instruction, so the fair comparison issues the SAME number of accelerator
+ * instructions. N=64, REPS=1024 -> 65536 mac_8() calls (= 262144 INT8 MACs, 4x
+ * the arithmetic), matching the 65536 MAC instructions of the scalar C mac_bench
+ * (N=64, REPS=1024). The two are then directly comparable at equal operand bits.
  */
 
 extern void eot_sequence();
 
 #ifdef USE_MAC_INSN
-static inline int qmac(int acc, int a, int b) {
+static inline int mac_8(int acc, int a, int b) {
     __asm__ volatile (
         ".insn r 0x0B, 0x5, 0x1, %0, %1, %2"
         : "+r"(acc)
@@ -31,7 +32,7 @@ static inline int qmac(int acc, int a, int b) {
     return acc;
 }
 #else
-static inline int qmac(int acc, int a, int b) {
+static inline int mac_8(int acc, int a, int b) {
     long long s = (long long)acc;
     s += (long long)(signed char)(a      ) * (signed char)(b      );
     s += (long long)(signed char)(a >>  8) * (signed char)(b >>  8);
@@ -44,7 +45,7 @@ static inline int qmac(int acc, int a, int b) {
 #endif
 
 #define N    64
-#define REPS 256   /* 64 * 256 = 16384 QMACs = 65536 INT8 MAC-equivalent ops */
+#define REPS 1024  /* 64 * 1024 = 65536 mac_8s = MAC count (mac/bit); 262144 INT8 MACs */
 
 volatile int a_arr[N];
 volatile int b_arr[N];
@@ -62,7 +63,7 @@ int main() {
     int acc = 0;
     for (int r = 0; r < REPS; r++) {
         for (int i = 0; i < N; i++) {
-            acc = qmac(acc, a_arr[i], b_arr[i]);
+            acc = mac_8(acc, a_arr[i], b_arr[i]);
         }
     }
     /* Keep `acc` live without a memory store so the hot loop is not eliminated. */
