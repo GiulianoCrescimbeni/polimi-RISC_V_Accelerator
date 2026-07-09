@@ -172,7 +172,7 @@ Speedup = `cycles_standard / cycles_config` (higher is faster).
   and on `conv2d` operand marshalling (four byte loads + shifts per instruction)
   dominates, dropping it to **0.56×**.
 
-See [`report.tex`](report.tex) for the full methodology, tables and discussion.
+See [`MAC_Implementation_Report.pdf`](MAC_Implementation_Report.pdf) for the full methodology, tables and discussion.
 
 ## Credits & License
 
