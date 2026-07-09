@@ -1,5 +1,4 @@
-# RISC-V ISA Acceleration for AI Kernels — the `mac_32` and `mac_8` Instructions
-
+# RISC-V ISA Acceleration for AI Kernels
 Custom RISC-V ISA extension that accelerates the multiply–accumulate (MAC) loops
 at the heart of neural-network inference and DSP kernels. Two custom instructions
 — **`mac_32`** (scalar fused MAC) and **`mac_8`** (4-lane INT8 SIMD MAC) — are
