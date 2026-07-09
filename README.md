@@ -1,219 +1,186 @@
-# Tiny Vedas - RISC-V RV32IM Processor
+# RISC-V ISA Acceleration for AI Kernels — the `mac_32` and `mac_8` Instructions
 
-A complete, open-source implementation of a RISC-V RV32IM processor written in SystemVerilog. Tiny Vedas is a 4-stage pipelined processor with full RV32IM instruction set support, hazard handling, and comprehensive verification.
+Custom RISC-V ISA extension that accelerates the multiply–accumulate (MAC) loops
+at the heart of neural-network inference and DSP kernels. Two custom instructions
+— **`mac_32`** (scalar fused MAC) and **`mac_8`** (4-lane INT8 SIMD MAC) — are
+designed, implemented in SystemVerilog and evaluated on a set of benchmarks under
+an equal *operand-bit* (MAC-per-bit) comparison.
 
-It is used as a reference for a [free course on RISC-V Processor Design](https://youtu.be/izPdo7n1u1I).
+The work is built on top of [**Tiny-Vedas**](https://github.com/spzbrnmrc/Tiny-Vedas),
+a compact 4-stage in-order RV32IM core (IFU → IDU0 → IDU1 → EXU). This repository
+adds the two functional units inside the execute stage, the decode/hazard support
+they require, and a dual-ELF verification and benchmarking flow.
 
-## Features
+> Academic project — Advanced Computer Architectures, Politecnico di Milano
+> (2025–2026). Author: **Giuliano Crescimbeni**.
+
+## What this project adds
+
+### The two custom instructions
+| Instruction | Semantics | Precision | Latency | Where it lives |
+|:-----------:|:----------|:---------:|:-------:|:---------------|
+| `mac_32` | `rd ← rd + rs1·rs2` | 32-bit | 3 cycles (multiplier pipeline) | fused into `rtl/exu/mul.sv` |
+| `mac_8`  | `rd ← sat₃₂(rd + Σᵢ rs1[i]·rs2[i])`, 4 signed INT8 lanes | INT8 → 32-bit saturating | 1 cycle | dedicated `rtl/exu/mac_8.sv` |
+
+Both are **destructive**: the destination `rd` also acts as the accumulator (third
+source), so no extra encoding bits are needed.
+
+### Encoding
+Both instructions live in the RISC-V **Custom-0** opcode space and share the
+M-extension `funct7` prefix, differing only in `funct3` — so no standard RV32IM
+encoding is touched.
+
+| Instruction | opcode | funct7 | funct3 |
+|:-----------:|:------:|:------:|:------:|
+| `mac_32` | `0x0B` (Custom-0) | `0000001` | `100` |
+| `mac_8`  | `0x0B` (Custom-0) | `0000001` | `101` |
+
+In C the instructions are emitted through the GCC `.insn` directive:
+`.insn r 0x0B,0x4,0x1,...` (`mac_32`) and `.insn r 0x0B,0x5,0x1,...` (`mac_8`).
+
+### Microarchitecture highlights
+- **`mac_32`** grafts a 32-bit adder at stage E3 of the existing 3-stage
+  multiplier, folding the product into the accumulator before write-back. A third
+  register-file read port supplies the accumulator, the register scoreboard (RSB)
+  is extended to catch RAW hazards on `rd`, and EXU→IDU1 forwarding is replicated
+  for the third operand.
+- **`mac_8`** is a dedicated single-cycle combinational unit beside the
+  ALU/MUL/DIV/LSU: four parallel signed 8×8 multipliers feed an adder tree, and
+  the dot product is added to the 32-bit accumulator on 33 bits (guard bit) and
+  saturated. It reuses the accumulator infrastructure but never enters the
+  multiplier pipeline, so for hazard purposes it behaves as a single-cycle op.
+- **Single write-back per cycle**: since every FU drives one OR-combined
+  write-back bus, dispatch holds a single-cycle producer in execute while the LSU
+  is busy, fixing a load/`mac_8` write-back collision surfaced by the convolution
+  benchmark.
+
+## Features (base core, provided by Tiny-Vedas)
 
 ### Architecture
-- **ISA**: RISC-V RV32IM (32-bit integer + multiply/divide)
-- **Pipeline**: 4-stage pipeline (IFU → IDU0 → IDU1 → EXU)
+- **ISA**: RISC-V RV32IM + the `mac_32`/`mac_8` custom extension
+- **Pipeline**: 4-stage in-order (IFU → IDU0 → IDU1 → EXU)
 - **Data Width**: 32-bit (XLEN = 32)
 - **Memory**: Harvard architecture with separate instruction and data memories
-- **Reset Vector**: Configurable (default: 0x80000000)
+- **Hazards**: register forwarding (EXU → IDU1), pipeline flush on branches,
+  multi-cycle multiplier/divider
 
 ### Instruction Set Support
-- **Arithmetic**: ADD, SUB, ADDI, LUI, AUIPC
-- **Logical**: AND, OR, XOR, ANDI, ORI, XORI
-- **Shifts**: SLL, SRL, SRA, SLLI, SRLI, SRAI
-- **Comparison**: SLT, SLTU, SLTI, SLTIU
-- **Branches**: BEQ, BNE, BLT, BGE, BLTU, BGEU
-- **Jumps**: JAL, JALR
-- **Memory**: LB, LH, LW, LBU, LHU, SB, SH, SW
-- **Multiply/Divide**: MUL, MULH, MULHU, MULHSU, DIV, DIVU, REM, REMU
-
-### Advanced Features
-- **Data Hazard Resolution**: Register forwarding from EXU to IDU1
-- **Control Hazard Handling**: Pipeline flush on branches
-- **Multi-cycle Operations**: Pipelined multiplier and divider
-- **Unaligned Memory Access**: Support for byte and half-word aligned loads/stores
-- **Memory Forwarding**: Store-to-load forwarding for performance
+- **Base RV32IM**: full arithmetic, logical, shift, comparison, branch, jump,
+  load/store, and MUL/DIV support (see Tiny-Vedas)
+- **Custom extension**: `mac_32`, `mac_8`
 
 ## Project Structure
 
 ```
-tiny-vedas/
-├── rtl/                    # RTL design files
-│   ├── core_top.sv        # Top-level processor module
-│   ├── core_top.flist     # File list for synthesis
-│   ├── ifu/               # Instruction fetch unit
-│   │   └── ifu.sv         # IFU implementation
-│   ├── idu/               # Instruction decode units
-│   │   ├── idu0.sv        # Decode stage 0
-│   │   ├── idu1.sv        # Decode stage 1
-│   │   ├── reg_file.sv    # Register file
-│   │   ├── decode.sv      # Auto-generated decode logic
-│   │   └── decode         # Decode table specification
-│   ├── exu/               # Execute unit
-│   │   ├── exu.sv         # Execute unit top-level
-│   │   ├── alu.sv         # Arithmetic logic unit
-│   │   ├── mul.sv         # Multiplier unit
-│   │   ├── div.sv         # Divider unit
-│   │   └── lsu.sv         # Load/store unit
-│   ├── include/           # Global definitions
-│   │   ├── global.svh     # Global parameters
-│   │   └── types.svh      # Type definitions
-│   └── lib/               # Utility modules
-│       ├── mem_lib.sv     # Memory modules
-│       └── beh_lib.sv     # Behavioral models
-├── tests/                 # Test programs
-│   ├── asm/              # Assembly test programs
-│   ├── c/                # C program tests
-│   └── raw/              # Raw binary tests
-├── dv/                    # Design verification
-│   ├── sv/               # SystemVerilog testbenches
-│   │   ├── core_top_tb.sv # Main testbench
-│   │   └── lsu_tb.sv      # LSU testbench
-│   └── verilator/        # Verilator simulation files
-├── tools/                 # Development utilities
-│   ├── dec_table_gen.py  # Decode table generator
-│   ├── sim_manager.py    # Simulation manager
-│   └── riscv_sim         # RISC-V simulator
-├── SVLib/                 # SystemVerilog library
-├── docs/                  # Documentation and Slides for the course
-├── Makefile              # Build and simulation targets
-└── LICENSE               # Apache 2.0 license
+polimi-RISC_V_Accelerator/
+├── rtl/                        # RTL design files
+│   ├── core_top.sv            # Top-level processor module
+│   ├── ifu/ifu.sv             # Instruction fetch unit
+│   ├── idu/                   # Instruction decode units
+│   │   ├── idu0.sv            # Decode stage 0 (register read)
+│   │   ├── idu1.sv            # Decode stage 1 (dispatch + hazards, MAC-aware)
+│   │   ├── reg_file.sv        # Register file (3rd read port for accumulator)
+│   │   └── decode.sv          # Decode logic (mac_32/mac_8 decoded here)
+│   ├── exu/                   # Execute unit
+│   │   ├── exu.sv             # Execute top-level (write-back arbitration)
+│   │   ├── alu.sv             # Arithmetic logic unit
+│   │   ├── mul.sv             # Multiplier + fused mac_32 adder
+│   │   ├── div.sv             # Divider unit
+│   │   ├── lsu.sv             # Load/store unit
+│   │   └── mac_8.sv           # Single-cycle 4×INT8 SIMD MAC unit  (NEW)
+│   ├── include/               # Global definitions
+│   └── lib/                   # Utility / memory / behavioral models
+├── tests/
+│   ├── asm/                   # Assembly tests + benchmarks
+│   │   ├── basic_mac*.s       # mac_32 correctness/forwarding/hazard tests
+│   │   ├── basic_mac_8*.s     # mac_8 correctness/forwarding/hazard tests
+│   │   ├── mac_bench_*.s      # mac_bench: base / mac_32, incl. unrolled & par8
+│   │   └── mac_8_bench*.s     # mac_8 benchmarks (base / unrolled / par8)
+│   └── c/                     # C tests and benchmarks
+│       ├── mac_bench.c        # length-64 dot product (mac_32)
+│       ├── mac_8_bench.c      # length-64 dot product (mac_8)
+│       ├── conv2d.c           # 2D convolution (standard / mac_32)
+│       └── conv2d_mac_8.c     # 2D convolution (mac_8)
+├── dv/                        # Design verification (SystemVerilog + Verilator)
+├── tools/                     # sim_manager.py, decode-table gen, RISC-V ISS
+├── work/                      # Per-test build/sim output
+├── report.tex                 # Project report (PoliMi Executive Summary format)
+├── Makefile                   # Build and simulation targets
+└── LICENSE                    # Apache 2.0 license
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- **SystemVerilog Simulator**: Verilator (recommended) or Xilinx Vivado
-- **RISC-V Toolchain**: GCC with RISC-V target
-- **Python 3**: For build scripts
-- **Ubuntu 20.04+**: Tested platform
+- **Verilator** (cycle-accurate RTL simulation)
+- **RISC-V toolchain**: `riscv64-unknown-elf-gcc` (targets `rv32im` / `ilp32`)
+- **Python 3** (build scripts and the golden-model ISS)
 
-### Installation
+### Running simulations
+Two entry points, both driven by `tools/sim_manager.py`:
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/siliscale/Tiny-Vedas.git
-   cd Tiny-Vedas
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Install Verilator
-   sudo apt-get install verilator
-   
-   # Install RISC-V toolchain
-   sudo apt-get install gcc-riscv64-linux-gnu
-   
-   # Install Python dependencies
-   pip install -r requirements.txt
-   ```
-
-3. **Build and run simulation**
-   ```bash
-   # Run core simulation
-   make core_top_sim
-   
-   # Run specific tests
-   cd tests/asm
-   make basic_alu_r
-   ```
-
-## Simulation
-
-### Core Simulation
 ```bash
-make core_top_sim
-```
-This runs the main testbench with Verilator, executing test programs and generating execution traces.
+# Base flow (single ELF): assembly tests and base/mac_32 benchmarks
+make sim T=basic_mac_8            # -> asm.basic_mac_8
+make sim T=asm.mac_bench_mac      # mac_32 dot-product benchmark
 
-### Individual Unit Tests
-```bash
-# Test load/store unit
-make lsu_sim
-
-# Test specific assembly programs
-cd tests/asm
-make basic_alu_r    # Test ALU register operations
-make basic_mul      # Test multiplication
-make basic_branch   # Test branch instructions
+# Dual-ELF MAC flow: RTL build vs. Python ISS golden model
+make sim-mac T=mac_bench          # -> cdual.mac_bench
+make sim-mac T=conv2d             # 2D convolution, standard vs mac_32
+make sim-mac T=qmac_bench         # mac_8 (quad-MAC) benchmark
 ```
 
-### C Program Tests
-```bash
-cd tests/c
-make helloworld     # Compile and run C program
-```
-
-## Configuration
-
-### Memory Configuration
-- **Instruction Memory**: 1KB (1024 words)
-- **Data Memory**: 1KB (1024 words)
-- **Stack Pointer**: Configurable initial value (default: 0x80000000)
-
-### Pipeline Configuration
-- **Stages**: 4-stage pipeline
-- **Forwarding**: Full forwarding from EXU to IDU1
-- **Stalling**: Multi-cycle operation support
+> **Tip:** long benchmarks produce multi-GB waveform dumps. Set `NO_VCD=1` to
+> disable VCD generation when you only need cycle/instruction counts.
 
 ## Verification
 
-### Test Coverage
-- **Unit Tests**: Individual component verification
-- **Integration Tests**: Full pipeline verification
-- **Instruction Tests**: Complete RV32IM instruction set coverage
-- **Hazard Tests**: Data and control hazard scenarios
+Correctness is signed off with a **dual-ELF** flow: each C test is compiled twice,
+switched by the `USE_MAC_INSN` symbol —
+- a portable `acc + a*b` (or scalar four-lane reference for `mac_8`) build that
+  runs on a **Python RV32IM ISS** golden model, and
+- the custom `.insn` build that runs on the **Verilator** RTL.
 
-### Test Results
-Simulation results are logged to:
-- `rtl.log`: Instruction execution trace
-- `console.log`: Program output
-- Waveform files: For detailed timing analysis
+The source is identical, so any difference comes purely from the ISA extension;
+operand magnitudes are kept small so no overflow/saturation occurs and the two
+builds must leave **bit-for-bit identical** final state in the committed result
+globals.
 
-## Synthesis
+## Benchmarks & Results
 
-### FPGA Synthesis
-```bash
-# Generate decode tables
-make decodes
+Each testbench is run on three configurations — `standard` (RV32IM `mul+add`),
+`mac_32`, and `mac_8` — under the **MAC-per-bit** convention: a `mac_32` and a
+`mac_8` both move 64 operand bits per instruction, so a fair equal-bit comparison
+issues the same number of accelerator instructions (making `mac_8` do 4× the MAC
+arithmetic at INT8 precision).
 
-# Synthesize with Vivado
-make vivado_synth
-```
+| Benchmark | Description | `mac_32` speedup | `mac_8` speedup |
+|:---------:|:------------|:----------------:|:---------------:|
+| mac_bench (C)   | length-64 dot product, single accumulator | 1.06× | 1.20× |
+| mac_bench (asm) | hand-written assembly version             | 1.20× | 1.50× |
+| unrolled (asm)  | 8× unrolled, single accumulator           | 1.24× | 3.13× |
+| par8 (asm)      | 8× unrolled, 8 accumulators (SW renaming) | **2.76×** | 3.13× |
+| conv2d (C)      | "valid" 2D convolution, 4×4 kernel        | 1.04× | 0.56× |
 
-### ASIC Synthesis
-The design is synthesizable with standard ASIC tools. Use `rtl/core_top.flist` as the file list.
+Speedup = `cycles_standard / cycles_config` (higher is faster).
 
-## Performance
+**Takeaways:**
+- `mac_32` removes one `add` per MAC but every MAC traverses the 3-stage
+  multiplier and serialises on the accumulator RAW chain — it only takes off with
+  software register renaming (**par8, 2.76×**).
+- `mac_8`, being single-cycle, never suffers the accumulator chain and improves
+  CPI throughout, reaching **3.13×** — but its INT8 precision must be acceptable,
+  and on `conv2d` operand marshalling (four byte loads + shifts per instruction)
+  dominates, dropping it to **0.56×**.
 
-### Pipeline Performance
-- **CPI**: ~1.0 for most workloads
-- **Branch Penalty**: 1 cycle for taken branches
-- **Memory Latency**: 1 cycle for aligned accesses
+See [`report.tex`](report.tex) for the full methodology, tables and discussion.
 
-### Resource Utilization
-- **Registers**: ~2000 flip-flops
-- **LUTs**: ~5000 (FPGA estimate)
-- **Memory**: 2KB total (1KB instruction + 1KB data)
+## Credits & License
 
-## Contributing
+The base RV32IM core is [**Tiny-Vedas**](https://github.com/spzbrnmrc/Tiny-Vedas)
+by siliscale, used as a reference for a
+[free course on RISC-V Processor Design](https://youtu.be/izPdo7n1u1I). The
+`mac_32`/`mac_8` ISA extension, its RTL, verification and benchmarks are the
+contribution of this project.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
-
-### Development Guidelines
-- Follow SystemVerilog coding standards
-- Add comprehensive tests for new features
-- Update documentation for API changes
-- Ensure all tests pass before submitting
-
-## License
-
-This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
-
-## Performance Scoreboard
-
-|    Benchmark     |  IPC   |
-|:----------------:|:------:|
-| c.helloworld     | 0.6177 |
-| c.iaxpy          | 0.4564 |
-| elf.dhrystone    | 0.5078 |
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
